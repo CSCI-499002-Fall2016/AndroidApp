@@ -132,12 +132,12 @@ public class ToDoActivity extends Activity {
     private void authenticate() {
         // Login using the Google provider.
 
-        ListenableFuture<MobileServiceUser> mLogin = mClient.login(MobileServiceAuthenticationProvider.Google);
+        ListenableFuture<MobileServiceUser> mLogin = mClient.login(MobileServiceAuthenticationProvider.MicrosoftAccount);
 
         Futures.addCallback(mLogin, new FutureCallback<MobileServiceUser>() {
             @Override
             public void onFailure(Throwable exc) {
-                createAndShowDialog((Exception) exc, "Error");
+                createAndShowDialog((Exception) exc, "Error Unable to login");
             }
             @Override
             public void onSuccess(MobileServiceUser user) {
