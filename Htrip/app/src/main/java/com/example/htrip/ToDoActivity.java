@@ -51,7 +51,9 @@ import android.content.SharedPreferences.Editor;
 
 import com.microsoft.windowsazure.mobileservices.authentication.MobileServiceAuthenticationProvider;
 import com.microsoft.windowsazure.mobileservices.authentication.MobileServiceUser;
-
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.content.SharedPreferences.Editor;
 public class ToDoActivity extends Activity {
 
     /**
@@ -84,6 +86,9 @@ public class ToDoActivity extends Activity {
      * Progress spinner to use for table operations
      */
     private ProgressBar mProgressBar;
+    public static final String SHAREDPREFFILE = "temp";
+    public static final String USERIDPREF = "uid";
+    public static final String TOKENPREF = "tkn";
 
     /**
      * Initializes the activity
@@ -129,24 +134,57 @@ public class ToDoActivity extends Activity {
         }
 
     }
+    private void cacheUserToken(MobileServiceUser user)
+    {
+        SharedPreferences prefs = getSharedPreferences(SHAREDPREFFILE, Context.MODE_PRIVATE);
+        Editor editor = prefs.edit();
+        editor.putString(USERIDPREF, user.getUserId());
+        editor.putString(TOKENPREF, user.getAuthenticationToken());
+        editor.commit();
+    }
+    private boolean loadUserTokenCache(MobileServiceClient client)
+    {
+        SharedPreferences prefs = getSharedPreferences(SHAREDPREFFILE, Context.MODE_PRIVATE);
+        String userId = prefs.getString(USERIDPREF, null);
+        if (userId == null)
+            return false;
+        String token = prefs.getString(TOKENPREF, null);
+        if (token == null)
+            return false;
+
+        MobileServiceUser user = new MobileServiceUser(userId);
+        user.setAuthenticationToken(token);
+        client.setCurrentUser(user);
+
+        return true;
+    }
     private void authenticate() {
-        // Login using the Google provider.
+        // We first try to load a token cache if one exists.
+        if (loadUserTokenCache(mClient))
+        {
+            createTable();
+        }
+        // If we failed to load a token cache, login and create a token cache
+        else
+        {
+            // Login using the Google provider.
+            ListenableFuture<MobileServiceUser> mLogin = mClient.login(MobileServiceAuthenticationProvider.MicrosoftAccount);
 
-        ListenableFuture<MobileServiceUser> mLogin = mClient.login(MobileServiceAuthenticationProvider.MicrosoftAccount);
-
-        Futures.addCallback(mLogin, new FutureCallback<MobileServiceUser>() {
-            @Override
-            public void onFailure(Throwable exc) {
-                createAndShowDialog((Exception) exc, "Error Unable to login");
-            }
-            @Override
-            public void onSuccess(MobileServiceUser user) {
-                createAndShowDialog(String.format(
-                        "You are now logged in - %1$2s",
-                        user.getUserId()), "Success");
-                createTable();
-            }
-        });
+            Futures.addCallback(mLogin, new FutureCallback<MobileServiceUser>() {
+                @Override
+                public void onFailure(Throwable exc) {
+                    createAndShowDialog("You must log in. Login Required", "Error");
+                }
+                @Override
+                public void onSuccess(MobileServiceUser user) {
+                    createAndShowDialog(String.format(
+                            "You are now logged in - %1$2s",
+                            user.getUserId()), "Success");
+                    cacheUserToken(mClient.getCurrentUser());
+                    createTable();
+                }
+            });
+        }
     }
     private void createTable() {
 
